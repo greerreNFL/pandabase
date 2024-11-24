@@ -1,0 +1,1 @@
+A python package for mirroring pandas dataframes to supabase tables.

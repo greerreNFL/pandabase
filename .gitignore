@@ -1,0 +1,23 @@
+# env variables
+*.env
+
+# pycache
+__pycache__
+
+# macos
+*.DS_Store
+
+# cursor
+*.cursorrules
+
+# vscode
+.vscode
+
+# cache created by user ##
+DBs/*
+!DBs/.gitkeep
+
+# logs ##
+*/Logs/*
+!*/Logs/.gitkeep
+*.log
