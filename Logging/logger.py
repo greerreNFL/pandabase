@@ -38,7 +38,7 @@ class PandabaseLogger:
 
     ## my app ##
     import pandabase
-    from pandabase.logging.logger import logger
+    from pandabase.Logging import logger
     
     logger.configure(handlers=[BetterStackHandler], level=logging.DEBUG)
     
