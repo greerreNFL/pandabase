@@ -153,7 +153,7 @@ class DirectConnection:
                 c.data_type,
                 c.is_nullable,
                 c.column_default,
-                tc.constraint_type
+                STRING_AGG(tc.constraint_type, ', ') AS constraint_type
             FROM
                 information_schema.columns c
                 LEFT JOIN information_schema.key_column_usage kcu ON c.table_name = kcu.table_name
@@ -161,6 +161,12 @@ class DirectConnection:
                 LEFT JOIN information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name
             WHERE
                 c.table_name = %s
+            GROUP BY
+                c.column_name,
+                c.udt_name,
+                c.data_type,
+                c.is_nullable,
+                c.column_default
         '''
         ## execute query ##
         fields = []
@@ -181,9 +187,9 @@ class DirectConnection:
                             udt_name = field_record['udt_name'],
                             data_type = field_record['data_type'],
                             is_nullable = True if field_record['is_nullable'] == 'YES' else False,
-                            is_primary_key = True if field_record['constraint_type'] == 'PRIMARY KEY' else False,
-                            has_unique_constraint = True if field_record['constraint_type'] == 'UNIQUE' else False,
-                            has_foreign_key = True if field_record['constraint_type'] == 'FOREIGN KEY' else False,
+                            is_primary_key = False if field_record['constraint_type'] is None else True if 'PRIMARY KEY' in field_record['constraint_type'] else False,
+                            has_unique_constraint = False if field_record['constraint_type'] is None else True if 'UNIQUE' in field_record['constraint_type'] else False,
+                            has_foreign_key = False if field_record['constraint_type'] is None else True if 'FOREIGN KEY' in field_record['constraint_type'] else False,
                             has_default = True if field_record['column_default'] is not None else False,
                             default_value = field_record['column_default']
                         )
