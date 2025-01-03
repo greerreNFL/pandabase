@@ -23,6 +23,20 @@ class TableStats:
     record_count: int
     total_modifications: int
 
+    def __post_init__(self):
+        '''
+        Post initialization logic -- special handling for empty data that
+        occurs when a table is empty in supabase
+        '''
+        if self.last_modified is None:
+            self.last_modified = datetime.fromisoformat('1970-01-01T00:00:00+00:00')
+        
+        if self.record_count is None:
+            self.record_count = 0
+
+        if self.total_modifications is None:
+            self.total_modifications = 0
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any])->'TableStats':
         '''

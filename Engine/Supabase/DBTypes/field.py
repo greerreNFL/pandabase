@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, List
 import numpy as np
 import pandas as pd
@@ -25,6 +25,19 @@ class Field:
     has_foreign_key:bool=False
     has_default:bool=False
     default_value:str=None
+    pd_dtype:str=field(init=False)
+
+    def __post_init__(self):
+        '''
+        Post initialization logic. Create a pd_dtype field for reference of 
+        valid dtype. This is used if the package needs to create an empty/dummy
+        df based on the schema for tables that have no existing data in the DB
+        '''
+        dtype_array = validity_map.get(self.udt_name.lower(), ['object'])
+        if len(dtype_array) == 0:
+            self.pd_dtype = 'object'
+        else:
+            self.pd_dtype = dtype_array[0]
     
     @classmethod
     def from_record(cls, record: Dict[str, Any]) -> 'Field':
@@ -59,8 +72,11 @@ class Field:
         '''
         ## container for valid downcasts ##
         valid_downcasts = []
+        ## handle empty ##
+        min_val = 0 if len(series) == 0 else series.min()
+        max_val = 0 if len(series) == 0 else series.max()   
         for dtype, range_dict in int_downcast_map.items():
-            if range_dict['min'] <= series.min() and range_dict['max'] >= series.max():
+            if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
                 valid_downcasts.append(dtype)
         return valid_downcasts
 
@@ -72,8 +88,11 @@ class Field:
         '''
         ## container for valid downcasts ##
         valid_downcasts = []
+        ## handle empty ##
+        min_val = 0.0 if len(series) == 0 else series.min()
+        max_val = 0.0 if len(series) == 0 else series.max()
         for dtype, range_dict in float_downcast_map.items():
-            if range_dict['min'] <= series.min() and range_dict['max'] >= series.max():
+            if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
                 valid_downcasts.append(dtype)
         return valid_downcasts
 

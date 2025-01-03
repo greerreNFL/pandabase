@@ -148,7 +148,7 @@ class SupaWrapper:
                 ).upsert(
                     batch,
                     count='exact',
-                    on_conflict=on_conflict
+                    on_conflict=','.join(on_conflict) ## supabase client requires string for multiple columns
                 ).execute()
                 ## unpack response ##
                 upserted = resp.count

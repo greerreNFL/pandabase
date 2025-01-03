@@ -100,6 +100,10 @@ class Table:
         Parameters:
         * df: a pandas dataframe
         '''
+        ## if df is empty, pandas will not have infered dtypes ##
+        ## set these explicitly ##
+        if len(df) == 0:
+            df = df.astype(self.schema.pd_dtypes)
         ## validate ##
         if not self.validate_df(df):
             self.logger.error(
@@ -131,7 +135,15 @@ class Table:
         '''
         ## pull from the db ##
         self.logger.info('Rebuilding {0} table'.format(self.table))
-        self.set_df(self.db.get_table(self.table))
+        df = self.db.get_table(self.table)
+        if len(df) == 0:
+            ## if no data existed (ie it is a new / empty table), create a new df based on schema ##
+            ## since the return from get_table() be empty and fail validation ##
+            self.logger.info('DB had no rows. Creating an empty df based on schema'.format(self.table))
+            self.set_df(pd.DataFrame(self.schema.pd_schema))
+        else:
+            self.set_df(df)
+        ## update meta ##
         self.meta = self.get_table_stats()
     
     def validate_cache(self):
