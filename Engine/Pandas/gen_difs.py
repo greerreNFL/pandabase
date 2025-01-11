@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict, Any
 
 def rows_are_equal(
         source_row:pd.Series,
         destination_row:pd.Series,
+        dtypes:Dict[str, numpy.dtype],
         ignore_columns: List[str] = ['created_at', 'updated_at']
     ) -> bool:
     '''
@@ -37,11 +38,19 @@ def rows_are_equal(
         if pd.isna(s_val) != pd.isna(d_val):
             return False
         ## check for numeric mismatch ##
-        if pd.api.types.is_numeric_dtype(source_row[col].dtype):
+        if pd.api.types.is_numeric_dtype(
+            dtypes[col]
+            if isinstance(dtypes[col], numpy.dtype)
+            else 'fail'
+        ):
             if not numpy.isclose(s_val, d_val, rtol=1e-05, atol=1e-08):
                 return False
         ## check time mismatch ##
-        if pd.api.types.is_datetime64_any_dtype(source_row[col].dtype):
+        if pd.api.types.is_datetime64_any_dtype(
+            dtypes[col]
+            if isinstance(dtypes[col], numpy.dtype)
+            else 'fail'
+        ):
             if pd.Timestamp(s_val) != pd.Timestamp(d_val):
                 return False
         ## standard comparison ##
@@ -71,7 +80,7 @@ def gen_diffs(
     ## handle no destination case ##
     ## this occurs when we have no cache or the dest has no records ##
     if df_destination is None:
-        return df_source, None  
+        return df_source, None
     ## create dictionaries of record indices keyed by primary keys ##
     source_index_by_pk = {
         tuple(row[primary_keys]) : idx
@@ -81,6 +90,8 @@ def gen_diffs(
         tuple(row[primary_keys]) : idx
         for idx, row in df_destination.iterrows()
     }
+    ## get dtypes for downstream dtype lookup ##
+    dtypes = {col: df_source[col].dtype for col in df_source.columns}
     ## find new and changed records (ie upserts) ##
     upsert_idx = set()
     for pk, idx in source_index_by_pk.items():
@@ -93,7 +104,8 @@ def gen_diffs(
             ## if rows are different, consider it an upsert ##
             if not rows_are_equal(
                 df_source.iloc[idx],
-                df_destination.iloc[destination_idx]
+                df_destination.iloc[destination_idx],
+                dtypes=dtypes
             ):
                 upsert_idx.add(idx)
     ## find deleted records ##
