@@ -198,7 +198,7 @@ class Field:
         ## container for tracking issues
         issues = []
         ## check nullability
-        if self.is_nullable and series.hasnans:
+        if not self.is_nullable and series.hasnans:
             issues.append('Column {0} is not nullable, but df has nans'.format(
                 self.name
             ))

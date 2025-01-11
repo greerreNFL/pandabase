@@ -62,6 +62,8 @@ class SupaDataFrame:
         if upserts is not None:
             ## convert any timstamp columns to a serializable isoformat ##
             upserts = convert_tz(upserts)
+            ## convert any nan values to None for serialisation ##
+            upserts = upserts.where(pd.notnull(upserts), None)
             self.table.upsert(upserts.to_dict(orient='records'))
             ## if no error thrown, operation was successful ##
             re_cache = True
