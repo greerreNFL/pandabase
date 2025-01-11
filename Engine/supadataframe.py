@@ -80,7 +80,7 @@ class SupaDataFrame:
             self.logger.info('No deletes to perform')
         ## update cache if successful changes were made ##
         if re_cache:
-            self.table.update_cache(self.df)
+            self.table.update_cache(self.df, force_analyze=True)
         else:
             self.logger.info('No changes to cache')
 

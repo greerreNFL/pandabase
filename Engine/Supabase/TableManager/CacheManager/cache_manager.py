@@ -106,7 +106,13 @@ class CacheManager:
             return False
         ## validate same lengths in the db and cached dataframe ##
         if len(self.local_df) != external_stats.record_count:
-            self.logger.warning('Cache for table {0} was invalidated due to mismatching record counts'.format(self.table))
+            self.logger.warning(
+                'Cache for table {0} was invalidated due to mismatching record counts: (local: {1}, db: {2})'.format(
+                    self.table,
+                    len(self.local_df),
+                    external_stats.record_count
+                )
+            )
             return False
         ## validate the hash by comparing the loaded df to the stored hash ##
         if self.local_hash != self.calculate_hash(self.local_df):

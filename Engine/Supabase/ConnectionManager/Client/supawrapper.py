@@ -75,7 +75,7 @@ class SupaWrapper:
                 ## paginated queries ##
                 resp = self.supabase.table(table_name)\
                     .select('*')\
-                    .range(start, start + page_size)\
+                    .range(start, start + page_size - 1)\
                     .execute()
                 records = resp.data
                 ## end if no records are returned ##

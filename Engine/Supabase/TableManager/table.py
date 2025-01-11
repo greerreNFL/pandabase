@@ -117,7 +117,7 @@ class Table:
     ############
     ## CACHE ##
     ############
-    def get_table_stats(self) -> TableStats:
+    def get_table_stats(self, force_analyze:bool=False) -> TableStats:
         '''
         Gets the table stats from the DB
 
@@ -125,6 +125,8 @@ class Table:
         * TableStats: an object containing the record count and number of modifications
         '''
         self.logger.info('Getting table stats for {0} table'.format(self.table))
+        if force_analyze:
+            self.db.ensure_updated_table_stats(self.table)
         stats = self.db.get_table_stats(self.table)
         return TableStats.from_dict(stats)
 
@@ -172,16 +174,17 @@ class Table:
             ## validate ##
             self.cache_valid = True
     
-    def update_cache(self, df:pd.DataFrame):
+    def update_cache(self, df:pd.DataFrame, force_analyze:bool=False):
         '''
         Updates the cache with a new df
 
         Parameters:
         * df: a pandas dataframe
+        * force_analyze: if True, will force ANALYZE on the table
         '''
         self.logger.info('Updating cache for {0} table'.format(self.table))
         self.set_df(df)
-        self.meta = self.get_table_stats()
+        self.meta = self.get_table_stats(force_analyze=force_analyze)
         self.cache.update_cache(self.meta, df)
         self.cache_valid = True
 

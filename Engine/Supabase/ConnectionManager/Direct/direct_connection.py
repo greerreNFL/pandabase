@@ -82,6 +82,31 @@ class DirectConnection:
     #############
     ## METHODS ##
     #############
+    def ensure_updated_table_stats(self, table_name:str)->None:
+        '''
+        Ensures that the table stats in pg_stat_user_tables are updated
+        for the get_table_stats function by calling ANALYZE on the table
+        '''
+        ## define query ##
+        query = sql.SQL('''
+            ANALYZE {table};
+        ''').format(
+            table=sql.Identifier(table_name)
+        )
+        ## execute query ##
+        try:
+            self.logger.info('Manually triggering ANALYZE on {0} to ensure updated table stats'.format(table_name))
+            with self.session() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute(query, (table_name, table_name))
+                    return cur.fetchone()
+        except Exception as e:
+            self.logger.error(
+                'Failed to run ANALYZE on {0}'.format(table_name),
+                extra={'error': str(e)}
+            )
+            raise e
+
     def get_table_stats(self, table_name:str)->Dict[str, Any]:
         '''
         Gets metadata for a given table in the database
@@ -93,30 +118,29 @@ class DirectConnection:
         * dict of last_modified and record_count
         '''
         ## define query ##
-        ## paramaterize for security ##
         query = sql.SQL('''
+            WITH counts AS (
+                SELECT 
+                    max(updated_at) as last_modified,
+                    COUNT(*) as record_count
+                FROM {table}
+            ),
+            modifications AS (
+                SELECT
+                    n_tup_ins + n_tup_upd + n_tup_del as total_modifications
+                FROM
+                    pg_stat_user_tables
+                WHERE
+                    relname = {table_name}
+            )
             SELECT 
-                max(updated_at) as last_modified,
-                (
-                    SELECT
-                        n_live_tup
-                    FROM
-                        pg_stat_user_tables
-                    WHERE
-                        relname = %s
-                ) as record_count,
-                (
-                    SELECT
-                        n_tup_ins + n_tup_upd + n_tup_del
-                    FROM
-                        pg_stat_user_tables
-                    WHERE
-                        relname = %s
-                ) as total_modifications
-            FROM
-                {table}
+                counts.last_modified,
+                counts.record_count,
+                modifications.total_modifications
+            FROM counts, modifications
         ''').format(
-            table=sql.Identifier(table_name)
+            table=sql.Identifier(table_name),
+            table_name=sql.Literal(table_name)
         )
         ## execute query ##
         try:

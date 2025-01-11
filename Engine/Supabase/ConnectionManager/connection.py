@@ -130,6 +130,12 @@ class Connection:
         '''
         return self.supabase.get_table(table_name)
 
+    def ensure_updated_table_stats(self, table_name:str)->None:
+        '''
+        Ensures that the table stats are updated for a given table
+        '''
+        self.conn.ensure_updated_table_stats(table_name)
+
     def get_table_stats(self, table_name:str)->Dict[str, Any]:
         '''
         Gets metadata for a given table in the database
