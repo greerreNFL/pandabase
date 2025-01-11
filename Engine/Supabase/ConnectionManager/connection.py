@@ -77,12 +77,10 @@ class Connection:
         ## establish .env location
         env_loc = '{0}/.env'.format(self.pandabase_root)
         if os.path.exists(env_loc):
-            self.logger.info('Loading global .env file')
             load_dotenv(env_loc)
         ## load credentials ##
         var_prefix = '{0}_'.format(self.db.upper())
         try:
-            self.logger.info('Loading credentials for {0}'.format(self.db))
             return DBCredentials(
                 supabase_url=os.getenv('{0}SUPABASE_URL'.format(var_prefix)),
                 supabase_key=os.getenv('{0}SUPABASE_KEY'.format(var_prefix)),

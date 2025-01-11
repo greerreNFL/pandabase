@@ -33,7 +33,6 @@ class DirectConnection:
         Creates direct connection to the database
         '''
         try:
-            self.logger.info('Connecting to database')
             self.conn = psycopg2.connect(
                 host=self.credentials.db_host,
                 database=self.credentials.db_name,
@@ -41,7 +40,6 @@ class DirectConnection:
                 password=self.credentials.db_password,
                 port=self.credentials.db_port
             )
-            self.logger.info('Connected to database')
         except Exception as e:
             self.logger.error(
                 'DB_ERROR: Failed to make direct connection to the database',

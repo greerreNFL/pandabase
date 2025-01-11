@@ -104,7 +104,6 @@ class TableSchema:
                     issues.extend(validation_issues)
         ## return ##
         if conforming:
-            self.logger.info('Dataframe schema conforms to {0} schema'.format(self.table_name))
             return True
         else:
             self.logger.error(

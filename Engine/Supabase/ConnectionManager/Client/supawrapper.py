@@ -26,12 +26,10 @@ class SupaWrapper:
         Connects the supabase client
         '''
         try:
-            self.logger.info('Connecting to supabase')
             self.supabase = create_client(
                 self.credentials.supabase_url,
                 self.credentials.supabase_key
             )
-            self.logger.info('Connected to supabase')
         except Exception as e:
             self.logger.error(
                 'Failed to connect to supabase',

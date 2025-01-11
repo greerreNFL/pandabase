@@ -55,6 +55,25 @@ def rows_are_equal(
                 return False
         ## standard comparison ##
         if s_val != d_val:
+            # Time objects (dates, timestamps, etc) may be held as strings in source dataframe and still
+            # pass validation against DB schema because they are parsable as timestamps.
+            # Row comparison relies on the source dataframe's dtypes, meaning it is possible that a
+            # a timestamp column is treated as a string column. This may not reliably pass standard comparison
+            # because pandas and postgres to not necessarily serialize and deserialize timestamps to the
+            # same format, and string conversion of timestamps can introduce formatting differences as well.
+            # For instance, "2024-01-01T00:00:00+00:00" will not be deemed equal to "2024-01-01 00:00:00+00:00"
+            # If the source dataframe dtypes have interpreted the column as a string (ie object)
+            # Ideally, formatting is handled upstream by the user, but as a fallback, an additional
+            # check is done here to ensure we do not create an unnecessary upsert based only on malformed
+            # timestamps
+            try:
+                if isinstance(s_val, str) and isinstance(d_val, str):
+                    ## if its an object that can be converted to a timestamp, return
+                    ## the comparison of the converted values
+                    return pd.to_datetime(s_val) == pd.to_datetime(d_val)
+            except (ValueError, TypeError):
+                ## if it cannot be converted to a timestamp, proceed with standard comparison
+                pass
             return False
     ## if all checks pass, the rows are equal ##
     return True
