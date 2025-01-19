@@ -99,7 +99,6 @@ class DirectConnection:
             with self.session() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute(query, (table_name, table_name))
-                    return cur.fetchone()
         except Exception as e:
             self.logger.error(
                 'Failed to run ANALYZE on {0}'.format(table_name),
