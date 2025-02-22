@@ -195,6 +195,23 @@ class Table:
         '''
         Upserts data to the table
         '''
+        ## upserts with ints can be tricky do to how pandas handles ints with nulls ##
+        ## if these have not been converted upstream, or some error caused them to be ##
+        ## read as objects or floats, the upsert can fail ##
+        ## To ensure that the data is properly typed, any int fields will be cast as ints ##
+        ## before upsert.
+        ## Since validation has been performed on the data, this should not throw errors ##
+        ## determine which fields to cast ##
+        int_casts = []
+        for field in self.schema.fields:
+            if field.udt_name in ['int2', 'int4', 'int8']:
+                int_casts.append(field.name)
+        ## cast the int fields if necessary ##
+        if len(int_casts) > 0:
+            for rec in data:
+                for field in int_casts:
+                    rec[field] = int(rec[field]) if rec[field] is not None else None
+        ## perform the upsert ##
         self.db.upsert(
             self.table,
             data,

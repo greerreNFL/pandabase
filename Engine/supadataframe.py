@@ -63,7 +63,11 @@ class SupaDataFrame:
             ## convert any timstamp columns to a serializable isoformat ##
             upserts = convert_tz(upserts)
             ## convert any nan values to None for serialisation ##
-            upserts = upserts.where(pd.notnull(upserts), None)
+            ## note, numeric columns cannot support mixed dtypes. Ints will be
+            ## converted to objects, allowing for the None, but floats will not, and a None
+            ## will be converted back to a nan. Thus, the entire df needs to be typed as
+            ## an object before serialisation.
+            upserts = upserts.astype(object).where(pd.notnull(upserts), None)
             self.table.upsert(upserts.to_dict(orient='records'))
             ## if no error thrown, operation was successful ##
             re_cache = True

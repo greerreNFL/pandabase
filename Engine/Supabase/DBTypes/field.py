@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, List
-import numpy as np
+import numpy
 import pandas as pd
 import json
 import re
@@ -11,6 +11,7 @@ from .validity_map import validity_map
 ## pandas casting maps ##
 from .int_downcast_map import int_downcast_map
 from .float_downcast_map import float_downcast_map
+
 @dataclass
 class Field:
     '''
@@ -73,8 +74,8 @@ class Field:
         ## container for valid downcasts ##
         valid_downcasts = []
         ## handle empty ##
-        min_val = 0 if len(series) == 0 else series.min()
-        max_val = 0 if len(series) == 0 else series.max()   
+        min_val = 0 if len(series.dropna()) == 0 else series.min()
+        max_val = 0 if len(series.dropna()) == 0 else series.max()   
         for dtype, range_dict in int_downcast_map.items():
             if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
                 valid_downcasts.append(dtype)
@@ -85,15 +86,30 @@ class Field:
         For an float dtype, get a list of valid downcasts to determine
         the set of float types the pandas type, which defaults to a wider float range, can
         be downcast to by pg
+
+        This also handles instances where the series is a float64 due to nulls, in which case
+        the data is parsed to determine if the non-null values 1) have no residuals and data
+        will not be lost when assigned to int and 2) are within the range of the int type
+
+        If the series is entirely null, it can be cast to any numeric type that allows nulls
+        without losing data and therefore is accepted as a valid cast
         '''
         ## container for valid downcasts ##
         valid_downcasts = []
-        ## handle empty ##
-        min_val = 0.0 if len(series) == 0 else series.min()
-        max_val = 0.0 if len(series) == 0 else series.max()
+        ## handle empty or all nan -- if the float is empty, the data can be any ##
+        ## type of float ##
+        min_val = 0.0 if len(series.dropna()) == 0 else series.min()
+        max_val = 0.0 if len(series.dropna()) == 0 else series.max()
         for dtype, range_dict in float_downcast_map.items():
             if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
                 valid_downcasts.append(dtype)
+        ## handle potentiality for int casting by pg ##
+        if (series - numpy.floor(series)).sum() == 0:
+            ## if the float type does not contain any information above it's int counterpart,
+            ## allow the float to be cast as int ##
+            for dtype, range_dict in int_downcast_map.items():
+                if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
+                    valid_downcasts.append(dtype)
         return valid_downcasts
 
     def valid_timestamp_cast(self, series:pd.Series) -> bool:
@@ -119,7 +135,18 @@ class Field:
         if len(valid_dtypes) == 0:
             ## again, custom types will be skipped as valid ##
             return True
-        ## special logic for pandas casting ##
+        ## special logic for all null fields ##
+        ## if the pg field is a numeric that allows nulls, an all null series can
+        ## be cast without losing data and should be accepted as valid ##
+        ## This is a material consideration since an all null series may be read
+        ## from the cache as an object, and would not trigger an int or float cast
+        ## check.
+        numeric_dtypes = ['int16', 'int32', 'int64', 'float32', 'float64']
+        if any(dtype in numeric_dtypes for dtype in valid_dtypes):
+            ## if field accepts numeric types, perform an all null check ##
+            if series.isnull().all():
+                return True
+        ## special logic for pandas numeric casting ##
         castable_dtypes = []
         ## INT ##
         if pd.api.types.is_integer_dtype(series):
@@ -161,7 +188,7 @@ class Field:
                 else:
                     return False
             return True
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             return False
 
     def point_validation(self, series: pd.Series) -> bool:

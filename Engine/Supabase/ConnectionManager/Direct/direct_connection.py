@@ -199,7 +199,7 @@ class DirectConnection:
                     field_records = cur.fetchall()
                     ## error handle ##
                     if len(field_records) == 0:
-                        raise Exception('DB ERROR: Table {1} not found'.format(table_name))
+                        raise Exception('DB ERROR: Table {0} not found'.format(table_name))
                     ## convert records into Fields ##
                     for field_record in field_records:
                         ## convert record into a Field

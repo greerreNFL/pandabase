@@ -102,6 +102,11 @@ class TableSchema:
                 if len(validation_issues) > 0:
                     conforming = False
                     issues.extend(validation_issues)
+        ## check that extra columns were not included ##
+        for column in df.columns:
+            if column not in [field.name for field in self.fields]:
+                conforming = False
+                issues.append('Column {0} included in dataframe but not found in schema'.format(column))
         ## return ##
         if conforming:
             return True
