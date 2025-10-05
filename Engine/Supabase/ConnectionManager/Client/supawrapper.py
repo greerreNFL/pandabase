@@ -222,24 +222,53 @@ class SupaWrapper:
                         .in_(key_name, key_values)
                     )
                 else:
-                    ## if composite key, create and condition for each key ##
                     conditions = []
                     for rec in batch:
                         ## create and conditions for each key ##
                         and_conditions = []
                         for key_name, key_value in rec.items():
                             and_conditions.append('{0}.eq.{1}'.format(key_name, key_value))
-                        ## add and conditions to the list ##
+                        ## add and conditions using PostgREST and() syntax ##
                         conditions.append(
-                            ' and '.join(and_conditions)
+                            'and({0})'.format(','.join(and_conditions))
                         )
-                    ## Combine batch conditions with or ##
-                    where_clause = '({0})'.format(') or ('.join(conditions))
+                    ## We need to get batched considtions (ie where_clause) into a format for supabase py
+                    ## We've had large struggles with the behavior of or_, so we are leaving comments for future explorers
+                    ##
+                    ## or_ will wrap the conditions in parentheses, so our original approach created tripple nested parentheses
+                    ## which threw syntax errors
+                    ## 
+                    ## Original APPROACH:
+                    ##    where_clause = '({0})'.format(') or ('.join(conditions)) ##
+                    ##    This wrapped before sending to or_:
+                    ##    ((a and b) or (c and d))
+                    ##    when past to or_, or_ wrapped again:
+                    ##    (((a and b) or (c and d)))
+                    ##    this is incorrect and throws a syntax error
+                    ## We then tried to simply join without the outer parentheses, which worked...sometimes...but then still
+                    ## threw the tripple nested parentheses error:
+                    ##    "failed to parse logic tree (((gsis_id.eq.00-0037539 and season.eq.2025)....))"
+                    ##    This approach used and() to create the conditions, 
+                    ##    conditions.append(
+                    ##        'and({0})'.format(','.join(and_conditions))
+                    ##    )
+                    ##    conditions_wrapped = ['({0})'.format(condition) for condition in conditions]
+                    ##    Which seemed to be parsed correctly into (a and b), per the syntax error
+                    ##    and then the they were joined with or to create the full clause
+                    ##    where_clause = ' or '.join(conditions_wrapped)
+                    ##    So in theory, this was '(and(a,b)) or (and(c,d))'
+                    ##    And sometimes it started throwing tripple nested parentheses errors as it got translated by or_ to
+                    ##    (((a and b) or (c and d)))
+                    ## As a result, we are now trying something from the official docs 
+                    ## https://supabase.com/docs/reference/python/or:
+                    ##    .or_("id.gt.3,and(id.eq.1,name.eq.Mercury)")
+
+
                     ## create query ##
                     query = (
                         self.supabase.table(table_name)
                         .delete()
-                        .or_(where_clause)
+                        .or_(','.join(conditions))
                     )
                 ## execute delete ##
                 resp = query.execute()

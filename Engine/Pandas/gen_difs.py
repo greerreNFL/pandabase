@@ -24,6 +24,8 @@ def rows_are_equal(
     '''
     ## loop through columns ##
     for col in source_row.index:
+        ## container for is close check ##
+        is_close = False
         ## skip ignored columns ##
         ## by default, these are the system columns created_at and updated_at ##
         if col in ignore_columns:
@@ -36,6 +38,7 @@ def rows_are_equal(
             continue
         ## check for null mismatch ##
         if pd.isna(s_val) != pd.isna(d_val):
+            print(f'{col} mismatch in null check: {s_val} != {d_val}')
             return False
         ## check for numeric mismatch ##
         if pd.api.types.is_numeric_dtype(
@@ -43,8 +46,16 @@ def rows_are_equal(
             if isinstance(dtypes[col], numpy.dtype)
             else 'fail'
         ):
-            if not numpy.isclose(s_val, d_val, rtol=1e-05, atol=1e-08):
+            ## if it is a numeric type, check if they are close ##
+            if not numpy.isclose(s_val, d_val, rtol=0.01, atol=0):
+                print(f'{col} mismatch in numeric check: {s_val} != {d_val}')
                 return False
+            else:
+                ## if they are close, set the flag ##
+                ## note, we dont *return* true simply to be very strict with the
+                ## pattern of no early positive returns, which can introduce bugs
+                ## that would cause rows not to upsert.
+                is_close = True
         ## check time mismatch ##
         if pd.api.types.is_datetime64_any_dtype(
             dtypes[col]
@@ -52,28 +63,34 @@ def rows_are_equal(
             else 'fail'
         ):
             if pd.Timestamp(s_val) != pd.Timestamp(d_val):
+                print(f'{col} mismatch in time check: {s_val} != {d_val}')
                 return False
         ## standard comparison ##
-        if s_val != d_val:
-            # Time objects (dates, timestamps, etc) may be held as strings in source dataframe and still
-            # pass validation against DB schema because they are parsable as timestamps.
+        if s_val != d_val and not is_close:
+            # Time objects (dates, timestamps, etc), points (latlong), and json objects may be held as strings in source dataframe and still
+            # pass validation against DB schema because they are parsable into their respective formats.
             # Row comparison relies on the source dataframe's dtypes, meaning it is possible that a
-            # a timestamp column is treated as a string column. This may not reliably pass standard comparison
-            # because pandas and postgres to not necessarily serialize and deserialize timestamps to the
+            # a the column is treated as a string column. This may not reliably pass standard comparison
+            # because pandas and postgres to not necessarily serialize and deserialize these data types to the
             # same format, and string conversion of timestamps can introduce formatting differences as well.
             # For instance, "2024-01-01T00:00:00+00:00" will not be deemed equal to "2024-01-01 00:00:00+00:00"
             # If the source dataframe dtypes have interpreted the column as a string (ie object)
             # Ideally, formatting is handled upstream by the user, but as a fallback, an additional
             # check is done here to ensure we do not create an unnecessary upsert based only on malformed
-            # timestamps
+            # timestamps, points, or json objects.
             try:
                 if isinstance(s_val, str) and isinstance(d_val, str):
+                    ## if trimmed and lowercased are equal, all is good ##
+                    if s_val.replace(" ", "").lower() == d_val.replace(" ", "").lower():
+                        continue
                     ## if its an object that can be converted to a timestamp, return
                     ## the comparison of the converted values
-                    return pd.to_datetime(s_val) == pd.to_datetime(d_val)
+                    if pd.to_datetime(s_val) != pd.to_datetime(d_val):
+                        return False
             except (ValueError, TypeError):
                 ## if it cannot be converted to a timestamp, proceed with standard comparison
                 pass
+            print(f'{col} mismatch in standard check: {s_val} != {d_val}')
             return False
     ## if all checks pass, the rows are equal ##
     return True
@@ -100,6 +117,9 @@ def gen_diffs(
     ## this occurs when we have no cache or the dest has no records ##
     if df_destination is None:
         return df_source, None
+    ## hand no primary keys ##
+    if len(primary_keys) == 0:
+        raise ValueError('No primary keys provided. Pandbase requires primary keys for all tables')
     ## create dictionaries of record indices keyed by primary keys ##
     source_index_by_pk = {
         tuple(row[primary_keys]) : idx

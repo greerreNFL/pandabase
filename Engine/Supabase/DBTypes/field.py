@@ -79,6 +79,11 @@ class Field:
         for dtype, range_dict in int_downcast_map.items():
             if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
                 valid_downcasts.append(dtype)
+        ## handle potentiality for int casting by pg ##
+        ## ints can always be cast to float so long as the range is not too large ##
+        for dtype, range_dict in float_downcast_map.items():
+            if range_dict['min'] <= min_val and range_dict['max'] >= max_val:
+                valid_downcasts.append(dtype)
         return valid_downcasts
 
     def valid_float_downcasts(self, series:pd.Series) -> List[str]:
@@ -144,6 +149,12 @@ class Field:
         numeric_dtypes = ['int16', 'int32', 'int64', 'float32', 'float64']
         if any(dtype in numeric_dtypes for dtype in valid_dtypes):
             ## if field accepts numeric types, perform an all null check ##
+            if series.isnull().all():
+                return True
+        ## same is true in reverse -- if an all null series is read as a numeric when it
+        ## its destination type is a varchar (that accepts nulls), it would fail a dtype test
+        ## even though it can be cast into the field.
+        if any(dtype in ['object', 'string'] for dtype in valid_dtypes):
             if series.isnull().all():
                 return True
         ## special logic for pandas numeric casting ##
